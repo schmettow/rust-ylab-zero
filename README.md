@@ -1,31 +1,29 @@
-# YLab Edge 
+# YLab Edge
 
 In a sister project we have introduced the [YLab](https://github.com/schmettow/ylab) for building interactive sensor recording devices. 
 Using the high-level API in CircuitPython, developing sensors for everyday research never was easier.
 
-The purpose of *YLab eDGe* is to follow YLab in spirit, but improve on what Ylab lacks the most, and that is: speed! 
-Current readings are in the range of 250 SPS, which is enough for some applications, but is insufficient for large sensor arrays with high sample rates, e.g. motion capture or EEG.
+The purpose of *YLab eDGe* is to follow YLab in spirit, but improve on what Ylab lacks the most, and that is: speed! Highest achieved readings with YLab are in the range of 250 SPS, which is enough for many applications, but is insufficient for large sensor arrays with high sample rates, e.g. motion capture or EEG.
 
 The solution is to re-implement the YLab API in the systems programming language [Rust](https://www.rust-lang.org/). 
-It is expected that this will trade around 20% ease-of-use for a performance improvement anywhere in the range between 2x and 200x.
+It is expected that this will trade around 20% ease-of-use for a performance improvement anywhere in the range between 2x and 200x. 
 
 # Current status
 
 You should include this crate if you are writing code that you want to run on
-a `Cytron Maker Pi Pico`. *Note* that this board is similar to the robotics-oriented Maker Pi RP2040, but not the same.
+a `Cytron Maker Pi Pico`. *Note* that the MP Pico is similar to the robotics-oriented Maker Pi RP2040, but not the same. (See [here](https://github.com/9names/makerpi_rp2040), if you have the latter).
 
 The crate provides a board specification (bsp) based on [rp2040-hal], but also assigns each pin to the following features of the board:
 
 + LED
-+ RGB LED
++ Smart LED
 + six Grove ports with a and b channels
 + 3 push buttons
 + SD card
-+ audio
++ audio/buzzer
 + wifi
 
 [rp2040-hal]: https://github.com/rp-rs/rp-hal/tree/main/rp2040-hal
-
 
 ## Usage
 
