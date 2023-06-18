@@ -10,9 +10,12 @@
 #![no_std]
 #![no_main]
 
+//use std::path::Prefix;
+
 use cortex_m_rt::entry;
 use panic_halt as _;
 
+//use smart_leds::RGB;
 // Make an alias for our board support package so copying examples to other boards is easier
 use ylab_edge as bsp;
 
@@ -26,8 +29,10 @@ use bsp::hal::{
 
 use rp2040_hal::pio::PIOExt;
 use ws2812_pio::{Ws2812Direct};
-use embedded_hal::digital::v2::InputPin;
+//use embedded_hal::digital::v2::InputPin;
 use embedded_hal::digital::v2::OutputPin;
+
+//use debounced_button::ButtonState::*;
 
 mod yui{    
     use ylab_edge as bsp;
@@ -53,8 +58,6 @@ mod yui{
         fn write<T>(&mut self, value: T);
     }
                     
-
-
     pub struct RgbLed {
         led: RgbStatusLed,
     }
@@ -69,6 +72,21 @@ mod yui{
             self.led.write(brightness(col.iter().cloned(), 32)).unwrap();
         }
 
+        pub fn red(&mut self){
+            self.write((255, 20, 0).into());
+        }
+
+        pub fn green(&mut self){
+            self.write((0, 255, 20).into());
+        }
+
+        pub fn blue(&mut self){
+            self.write((0, 20, 255).into());
+        }
+
+        pub fn white(&mut self){
+            self.write((255, 255, 255).into());
+        }
     }
 
     // Stateful button
@@ -103,18 +121,19 @@ mod yui{
         }
     }
 
-/*     // Event trait
-    pub trait EventButton {
-        fn update(&mut self) -> bool;
-        fn pressed(&self) -> bool;
-    }
-
-    impl<T: InputPin> EventButton for Button<T> {
-        fn pressed(&self) -> bool {
-            self.state
-        }
-    } */
 }
+
+// User events and Interaction
+// 
+use debounced_button::Button as DeButton;
+use debounced_button::ButtonState::*;
+
+#[derive(Debug,  // used as fmt
+         Clone, Copy, // because next_state 
+         PartialEq, Eq)] // testing equality
+enum State {Init, New, Ready, Record, Send}
+
+
 
 #[entry]
 fn main() -> ! {
@@ -153,15 +172,10 @@ fn main() -> ! {
                             &mut pio,
                             sm0,
                             clocks.peripheral_clock.freq()));
-
-    let red: smart_leds::RGB<u8> = (255, 0, 0).into();
-    //let yellow: smart_leds::RGB<u8> = (255, 255, 0).into();
-    let green: smart_leds::RGB<u8> = (0, 255, 0).into();
-    let _blue: smart_leds::RGB<u8> = (0, 0, 255).into();
-    let white: smart_leds::RGB<u8> = (255, 255, 255).into();
     
     // Init Button
-    let mut btn_1 = yui::Button::new(pins.button1.into_pull_up_input());
+    let mut btn_1 = 
+        yui::Button::new(pins.button1.into_pull_up_input());    
     
     // Init Led
     let mut led = pins.led.into_push_pull_output();
@@ -171,16 +185,29 @@ fn main() -> ! {
     use rp2040_hal::{adc::Adc};
     
     let core = pac::CorePeripherals::take().unwrap();
-    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
+    //let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
     
 
     // Prepare interaction flow
-    let mut state = "Stop";
+    //let mut state = "Stop";
     let mut trial: i8 = 0;
     let n_trials: i8 = 3;
     let mut adc = Adc::new(pac.ADC, &mut pac.RESETS);
     let mut adc_pin_0 = pins.grove_6_b.into_floating_input();
-    let mut this_value: u16;
+    let mut this_value: u16 = adc.read(&mut adc_pin_0).unwrap();
+    
+
+    // Button 2 and interaction
+    let mut btn_2 = 
+    DeButton::new(pins.button2.into_pull_up_input(), 
+                                        2, Default::default());
+    
+    #[derive(Debug,  // used as fmt
+         Clone, Copy, // because next_state 
+         PartialEq, Eq)] // testing equality
+    enum State {Init, New, Ready, Record, Send}
+    let mut state: State = State::Init;
+    //let mut next_state: State;
 
     loop{
         // Interaction
@@ -190,8 +217,42 @@ fn main() -> ! {
         } else {
             led.set_low().unwrap()
         }
-        //sleep(&mut delay, 10); // waiting for user input
-        if btn_1.state {
+
+        btn_2.poll();
+
+        // Collecting events, initiate transitions
+        let next_state = match (&state, btn_2.read()) {
+            (State::Init, _)        => State::New, // automatic transitional
+            (State::New,    Press)  => State::Ready,
+            (State::Ready,  Press)  => State::Record,
+            (State::Record, Press)  => State::Ready,
+            (State::New, LongPress) => State::Send,
+            (_,          LongPress) => State::New,
+            _                       => state,};
+
+        // Static UI, doing transition
+        if next_state != state {
+            match (state, next_state) {
+                (_,State::New)      => rgb.white(),
+                (_,State::Ready)    => {trial = trial + 1; rgb.green()},
+                (_,State::Record)   => rgb.red(),
+                (_,State::Send)     => rgb.blue(),
+                (_,_)               => {},};
+            state = next_state;
+            // transition complete
+
+        // Continuous stuff
+        match &state {
+            State::New      => {},
+            State::Ready    => {},
+            State::Record   => {this_value = adc.read(&mut adc_pin_0).unwrap();},
+            State::Send     => {},
+            _ => (),};
+        };
+
+
+// EATME
+/*         if btn_1.state {
             if state == "Stop" {        
                 trial = 0;
                 rgb.write(white);
@@ -218,12 +279,13 @@ fn main() -> ! {
         }
 
         // Continuous processing
+ */
 
+/*         }
         if state == "Pause" || state == "Record" {
             this_value = adc.read(&mut adc_pin_0).unwrap();
             delay.delay_ms(20);
         }
-
+ */
     }
   }
-}
