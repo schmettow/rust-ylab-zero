@@ -87,6 +87,11 @@ mod yui{
         pub fn white(&mut self){
             self.write((255, 255, 255).into());
         }
+
+        pub fn off(&mut self){
+            self.write((0, 0, 0).into());
+        }
+
     }
 
     // Stateful button
@@ -139,26 +144,26 @@ enum State {Init, New, Ready, Record, Send}
 fn main() -> ! {
     // Configure the RP2040 peripherals
 
-    let mut pac: pac::Peripherals = pac::Peripherals::take().unwrap();
-    let mut watchdog = Watchdog::new(pac.WATCHDOG);
+    let mut peri: pac::Peripherals = pac::Peripherals::take().unwrap();
+    let mut watchdog = Watchdog::new(peri.WATCHDOG);
 
     let clocks: rp2040_hal::clocks::ClocksManager = init_clocks_and_plls(
         bsp::XOSC_CRYSTAL_FREQ,
-        pac.XOSC,
-        pac.CLOCKS,
-        pac.PLL_SYS,
-        pac.PLL_USB,
-        &mut pac.RESETS,
+        peri.XOSC,
+        peri.CLOCKS,
+        peri.PLL_SYS,
+        peri.PLL_USB,
+        &mut peri.RESETS,
         &mut watchdog,
     )
     .ok()
     .unwrap();
-    let sio = Sio::new(pac.SIO);
+    let sio = Sio::new(peri.SIO);
     let pins = bsp::Pins::new(
-        pac.IO_BANK0,
-        pac.PADS_BANK0,
+        peri.IO_BANK0,
+        peri.PADS_BANK0,
         sio.gpio_bank0,
-        &mut pac.RESETS,
+        &mut peri.RESETS,
     );
 
     // INIT RGB
@@ -166,7 +171,7 @@ fn main() -> ! {
         = pins.smartleds.into_mode();
     // Configure the addressable LED
     let (mut pio, sm0, _, _, _) 
-        = pac.PIO0.split(&mut pac.RESETS);
+        = peri.PIO0.split(&mut peri.RESETS);
     let mut rgb
         = yui::RgbLed::new(Ws2812Direct::new(smartleds_pin,
                             &mut pio,
@@ -184,7 +189,7 @@ fn main() -> ! {
     use embedded_hal::adc::OneShot;
     use rp2040_hal::{adc::Adc};
     
-    let core = pac::CorePeripherals::take().unwrap();
+    //let core = pac::CorePeripherals::take().unwrap();
     //let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
     
 
@@ -192,15 +197,16 @@ fn main() -> ! {
     //let mut state = "Stop";
     let mut trial: i8 = 0;
     let n_trials: i8 = 3;
-    let mut adc = Adc::new(pac.ADC, &mut pac.RESETS);
+    let mut adc = Adc::new(peri.ADC, &mut peri.RESETS);
     let mut adc_pin_0 = pins.grove_6_b.into_floating_input();
     let mut this_value: u16 = adc.read(&mut adc_pin_0).unwrap();
     
 
     // Button 2 and interaction
     let mut btn_2 = 
-    DeButton::new(pins.button2.into_pull_up_input(), 
-                                        2, Default::default());
+    DeButton::new(pins.button2.into_pull_up_input(),
+                  5_000,
+                  Default::default());
     
     #[derive(Debug,  // used as fmt
          Clone, Copy, // because next_state 
@@ -234,10 +240,10 @@ fn main() -> ! {
         if next_state != state {
             match (state, next_state) {
                 (_,State::New)      => rgb.white(),
-                (_,State::Ready)    => {trial = trial + 1; rgb.green()},
+                (_,State::Ready)    => {rgb.green(); trial = trial + 1; },
                 (_,State::Record)   => rgb.red(),
                 (_,State::Send)     => rgb.blue(),
-                (_,_)               => {},};
+                (_,_)               => rgb.off(),};
             state = next_state;
             // transition complete
 
