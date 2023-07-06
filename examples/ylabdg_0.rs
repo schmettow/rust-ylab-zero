@@ -136,6 +136,8 @@ use debounced_button::ButtonState::*;
 #[derive(Debug,  // used as fmt
          Clone, Copy, // because next_state 
          PartialEq, Eq)] // testing equality
+
+// Define states
 enum State {Init, New, Ready, Record, Send}
 
 
@@ -227,8 +229,9 @@ fn main() -> ! {
         btn_2.poll();
 
         // Collecting events, initiate transitions
-        let next_state = match (&state, btn_2.read()) {
-            (State::Init, _)        => State::New, // automatic transitional
+        let next_state = 
+        match (&state, btn_2.read()) {
+            (State::Init,       _)  => State::New, // automatic transitional
             (State::New,    Press)  => State::Ready,
             (State::Ready,  Press)  => State::Record,
             (State::Record, Press)  => State::Ready,
